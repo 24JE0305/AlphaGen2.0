@@ -1,175 +1,162 @@
 ADVANCED ALPHA GENERATION PLAYBOOK
 ====================================
 
+## ABSOLUTE HARD RULES (NEVER VIOLATE — SYSTEM ENFORCED)
+
+1. universe MUST always be TOP3000. Never change to TOP1000, TOP500, TOP200.
+   Empirically validated: smaller universes reduce returns and hurt fitness.
+
+2. decay MUST always be >= 1. Never set decay to 0.
+   Empirically validated: decay=0 increases noise and destroys fitness.
+
+3. These two rules override everything else in this playbook.
+
+---
+
 ## PART 1: THE SIGNAL HIERARCHY
-Understanding WHAT makes a good alpha before HOW to code it.
 
-### Level 1 - Raw Signal (weak, easily arb'd)
-Single data field with minimal transformation.
-Example: rank(volume)
-Problem: Obvious. Overcrowded. Will fail SELF_CORRELATION.
+### Level 1 - Raw Signal (weak)
+Single data field, minimal transformation. Example: rank(volume)
+Problem: Overcrowded. Will fail SELF_CORRELATION.
 
-### Level 2 - Relative Signal (better)  
-Compare an asset against its group or historical self.
+### Level 2 - Relative Signal (better)
+Compare asset against its group or historical self.
 Example: group_zscore(close / ts_mean(close, 20), sector)
-Problem: Still derivative. Limited informational advantage.
 
 ### Level 3 - Compound Signal (strong)
 Cross two independent signals. One identifies WHAT to trade, one identifies WHEN.
 Example: rank(ts_delta(volume, 5) / ts_std_dev(volume, 20)) * rank(-ts_delta(close, 20))
-Logic: High abnormal volume + price mean reversion = informed selling signal.
 
-### Level 4 - Regime-Conditional Signal (elite)
-Apply signal only when market conditions favor it.
-Example: trade_when(ts_zscore(vix, 20) > 1, reversal_signal, 0)
-Logic: Reversal signals work better in high-volatility regimes.
+### Level 4 - Pipeline Signal (elite, use this structure always)
+Build in 4 explicit layers:
+  raw_signal = ...core predictive idea...;
+  neutralized = group_neutralize(raw_signal, subindustry);
+  smoothed = ts_decay_linear(neutralized, 5);
+  alpha = quantile(smoothed, driver="gaussian")
+
+Why: Each layer has one job. When a check fails, you know exactly which layer to fix.
+  HIGH_TURNOVER -> edit smoothed line only
+  LOW_FITNESS   -> edit alpha line only
+  LOW_SHARPE    -> edit raw_signal line only
+  LOW_SUB_UNIVERSE_SHARPE -> edit neutralized line only
 
 ---
 
-## PART 2: THE FAILURE DIAGNOSIS PROTOCOL
-
-Before making any change, diagnose the root cause:
+## PART 2: FAILURE DIAGNOSIS PROTOCOL
 
 ### HIGH TURNOVER (>70%)
-Root Cause: Signal oscillates daily (noise dominant)
+Root Cause: Signal changes position too fast.
 Fix Priority:
-  1. Add ts_decay_linear(signal, 5) wrapper (smooths without destroying ranking)
-  2. Increase Decay setting to 3-5
-  3. Use trade_when(entry_condition, signal, exit_condition) to hold positions
-  4. Replace ts_delta(x, 1) with ts_delta(x, 5) or ts_delta(x, 10)
-DO NOT: Change the core math. Only smooth the output.
+  1. Increase decay setting by 2 (keep universe=TOP3000)
+  2. Increase ts_decay_linear window in smoothed layer from 5 to 10
+  3. Replace ts_delta(x, 1) with ts_delta(x, 5)
+DO NOT: Change universe. DO NOT set decay to 0.
 
 ### LOW TURNOVER (<10%)
-Root Cause: Signal too stable (position never changes)
+Root Cause: Signal too stable, positions never change.
 Fix Priority:
-  1. Reduce Decay to 0
-  2. Use shorter lookback windows (ts_delta(x, 2) not ts_delta(x, 60))
-  3. Add a faster secondary signal with multiplication
-DO NOT: Use ts_decay_linear or hump.
+  1. Decrease decay by 1 (minimum decay=1, never go below)
+  2. Use shorter lookback windows
+  3. Add a faster secondary signal
+DO NOT: Set decay=0. Minimum is always 1.
 
 ### LOW FITNESS (< 1.0)
-Root Cause: THREE distinct causes. Diagnose first, THEN act.
-
 fitness = sharpe x sqrt(abs(returns) / turnover)
+THREE causes. Read the turnover value before acting.
 
-CAUSE A - Distribution not gaussian:
-  Symptom: quantile() NOT yet applied
-  Fix: Wrap final output in quantile(signal, driver="gaussian")
-  That is all. Do not change anything else.
+CAUSE A - No gaussian wrapper yet:
+  Symptom: expression does NOT end with quantile() or zscore(rank())
+  Fix: Add quantile(signal, driver="gaussian") as final line. Nothing else.
 
-CAUSE B - Turnover too high dragging fitness down:
-  Symptom: quantile() already applied, Sharpe decent (>1.3), turnover > 0.45, fitness stuck 0.6-0.8
-  CRITICAL: Do NOT smooth the expression with ts_decay_linear - this kills Sharpe.
-  Fix via SETTINGS ONLY, zero expression changes:
-    universe TOP3000 -> TOP1000 (cleaner stocks, higher returns per unit risk)
-    decay set to 0 (stop over-smoothing)
-    truncation lower to 0.04
-  This is a settings problem, not an expression problem.
+CAUSE B - Turnover too high (most common after CAUSE A fixed):
+  Symptom: quantile() already applied, turnover > 0.40, fitness 0.6-0.9
+  EMPIRICALLY CORRECT fix:
+    action_type = change_settings
+    Increase decay by 2 (e.g. decay=5 -> decay=7)
+    Keep universe=TOP3000 (HARD RULE — enforced by system)
+    Keep truncation unchanged
+  Do NOT touch the expression. One change only per step.
 
-CAUSE C - Returns magnitude too low:
-  Symptom: quantile() applied, turnover ok (<0.35), Sharpe ok, fitness still low
-  Fix: universe -> TOP1000 or TOP500 (higher beta = more return magnitude)
+CAUSE C - Turnover ok but fitness still low:
+  Symptom: quantile() applied, turnover < 0.35, fitness still < 1.0
+  Fix: Try zscore(rank(signal)) instead of quantile(). One swap.
+  If still failing after swap: increase decay by 1.
 
-DECISION TREE:
-  quantile NOT applied? -> CAUSE A, wrap it, stop.
-  quantile applied AND turnover > 0.40? -> CAUSE B, settings only, no expression change.
-  quantile applied AND turnover < 0.35? -> CAUSE C, change universe only.
-  quantile applied AND turnover 0.35-0.40? -> try zscore(rank(signal)) swap.
+DECISION TREE (follow exactly):
+  quantile/zscore NOT in expression? -> CAUSE A. Add wrapper. Stop.
+  wrapper present AND turnover > 0.40? -> CAUSE B. Increase decay by 2. Stop.
+  wrapper present AND turnover 0.30-0.40? -> CAUSE B. Increase decay by 1. Stop.
+  wrapper present AND turnover < 0.30? -> CAUSE C. Swap wrapper type. Stop.
 
 ### CONCENTRATED_WEIGHT
-Root Cause: A few stocks dominate the portfolio (top-heavy)
-Fix Priority:
-  1. Lower Truncation to 0.02 or 0.01
-  2. Wrap signal in: group_rank(signal, industry)
-  3. Or: winsorize(signal, std=2)
-DO NOT: Increase truncation — that makes it worse.
+Root Cause: Too few stocks dominate the book.
+Fix:
+  1. Lower truncation to 0.02 or 0.01
+  2. Wrap in group_rank(signal, industry)
+DO NOT: Increase truncation.
 
 ### LOW_SUB_UNIVERSE_SHARPE
-Root Cause: Signal works globally but not within specific sub-universes
-Fix Priority:
-  1. Change Neutralization to INDUSTRY or SUBINDUSTRY
-  2. Or explicitly neutralize: group_neutralize(signal, subindustry)
-  3. The signal needs to identify winners WITHIN sectors, not across them
-DO NOT: Use MARKET neutralization — too blunt.
+Root Cause: Signal works globally but not within sub-universes.
+Fix:
+  1. Change neutralization to INDUSTRY or SUBINDUSTRY
+  2. Add group_neutralize(signal, subindustry) in neutralized layer
+DO NOT: Use MARKET neutralization.
 
-### LOW SHARPE (< 0.8)
-Root Cause: Core signal has no predictive power
-Fix Priority:
-  1. THIS REQUIRES A COMPLETE REWRITE. Settings will not save this.
-  2. Start from a different signal category (see Compound Signal patterns)
-  3. Try: volatility-adjusted momentum, earnings surprise decay, or analyst revision momentum
+### LOW SHARPE (< 1.0)
+Root Cause: Core signal has no predictive power.
+Fix: Rewrite raw_signal layer only. Keep other layers intact.
+Use one of the patterns from Part 3.
 
 ---
 
-## PART 3: ADVANCED SIGNAL ARCHITECTURES
+## PART 3: SIGNAL ARCHITECTURES (always use pipeline structure)
 
 ### Pattern A: Volatility-Normalized Momentum
-```
-signal = ts_delta(close, 20) / ts_std_dev(close, 20);
-alpha = quantile(group_zscore(signal, sector), driver="gaussian")
-```
+raw_signal = ts_delta(close, 20) / ts_std_dev(close, 20);
+neutralized = group_neutralize(raw_signal, subindustry);
+smoothed = ts_decay_linear(neutralized, 5);
+alpha = quantile(smoothed, driver="gaussian")
 
-### Pattern B: Earnings Surprise Continuation
-```
-surprise_signal = (sales - ts_delay(sales, 63)) / ts_std_dev(sales, 252);
-recency_weight = ts_decay_linear(surprise_signal, 21);
-alpha = quantile(rank(recency_weight), driver="gaussian")
-```
+### Pattern B: Abnormal Volume + Price Reversion
+raw_signal = rank(ts_zscore(volume, 5)) * rank(-ts_zscore(high, 5));
+neutralized = group_neutralize(raw_signal, subindustry);
+smoothed = ts_decay_linear(neutralized, 5);
+alpha = quantile(smoothed, driver="gaussian")
 
 ### Pattern C: Liquidity-Adjusted Mean Reversion
-```
-ret_signal = -1 * ts_delta(close, 5);
-vol_weight = 1 / (ts_std_dev(volume, 20) + 0.001);
-combined = ret_signal * vol_weight;
-alpha = quantile(group_neutralize(combined, sector), driver="gaussian")
-```
+raw_signal = (-1 * ts_delta(close, 5)) / (ts_std_dev(volume, 20) + 0.001);
+neutralized = group_neutralize(raw_signal, subindustry);
+smoothed = ts_decay_linear(neutralized, 5);
+alpha = quantile(smoothed, driver="gaussian")
 
-### Pattern D: Cross-Asset Correlation Breakout
-```
-corr_signal = ts_corr(close, adv20, 20);
-breakout = ts_delta(corr_signal, 5);
-alpha = quantile(rank(-1 * breakout), driver="gaussian")
-```
+### Pattern D: Correlation Breakout
+raw_signal = -1 * ts_delta(ts_corr(close, adv20, 20), 5);
+neutralized = group_neutralize(raw_signal, subindustry);
+smoothed = ts_decay_linear(neutralized, 5);
+alpha = quantile(smoothed, driver="gaussian")
 
-### Pattern E: Fundamental Value Composite
-```
-value_1 = rank(1 / pbRatio);
-value_2 = rank(1 / peRatio);
-composite = 0.5 * value_1 + 0.5 * value_2;
-alpha = quantile(group_zscore(composite, industry), driver="gaussian")
-```
+### Pattern E: Fundamental Value
+raw_signal = group_zscore((1 / pbRatio) + (1 / peRatio), industry);
+neutralized = group_neutralize(raw_signal, subindustry);
+smoothed = ts_decay_linear(neutralized, 3);
+alpha = quantile(smoothed, driver="gaussian")
 
 ---
 
-## PART 4: SYNTAX RULES (CRITICAL — VIOLATIONS CRASH THE SIMULATOR)
+## PART 4: SYNTAX RULES
 
-1. Every statement ends with a semicolon EXCEPT the last one
-2. Final statement must be a pure expression (not an assignment)
-3. Variable names: lowercase letters, numbers, underscores only
-4. No Python-style operators: use divide(a,b) not a/b when in doubt
-5. All function arguments must be present: ts_corr requires EXACTLY 3 args
-6. group_* functions: third argument must be a grouping field string, not a variable
-7. Parenthesis balance: count opening vs closing — they must match
-
-### Common Crashes
-WRONG: ts_corr(close, volume)         → Missing 3rd arg (lookback)
-RIGHT: ts_corr(close, volume, 20)
-
-WRONG: group_rank(signal, "industry")  → String argument not valid
-RIGHT: group_rank(signal, industry)
-
-WRONG: signal = rank(close)            → Bare assignment as final line  
-RIGHT: signal = rank(close);\nzscore(signal)
+1. Every statement ends with semicolon EXCEPT the last line
+2. Final line must be a pure expression, not an assignment
+3. Variable names: lowercase, letters/numbers/underscores only
+4. ts_corr requires exactly 3 arguments: ts_corr(x, y, lookback)
+5. group_* third argument is bare field name: group_rank(x, industry) not group_rank(x, "industry")
+6. Count parentheses: opening must equal closing
 
 ---
 
-## PART 5: SETTINGS INTERACTION MATRIX
+## PART 5: EMPIRICALLY VALIDATED SETTINGS
 
-| Setting       | Effect on Sharpe | Effect on Turnover | Effect on Fitness |
-|--------------|-----------------|-------------------|------------------|
-| Decay ↑      | Often ↓ slightly | ↓↓ significantly  | Depends           |
-| Truncation ↓ | Often ↓ slightly | No effect         | ↑ (less waste)   |
-| SUBINDUSTRY  | Best for most    | No effect         | ↑ or ↓           |
-| INDUSTRY     | Good for value   | No effect         | ↑ or ↓           |
-| TOP1000      | ↑ (cleaner data) | No effect         | ↑                |
-| TOP3000      | ↓ (noisy small)  | No effect         | ↓ (more waste)   |
+universe:       TOP3000 always (HARD LOCK)
+decay:          1 to 10, NEVER 0 (HARD LOCK, minimum=1)
+neutralization: SUBINDUSTRY for most signals
+truncation:     0.04 to 0.08

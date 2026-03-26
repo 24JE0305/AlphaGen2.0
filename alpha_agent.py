@@ -160,6 +160,7 @@ class PromptBuilder:
         sim_summary: str,
         history_summary: str,
         parent_alphas: Optional[list[dict]] = None,
+        hard_constraint: str = "",
     ) -> str:
         parent_section = ""
         if parent_alphas:
@@ -168,7 +169,7 @@ class PromptBuilder:
                 parent_section += f"\nParent {i+1} (Sharpe={p['sharpe']:.3f}):\n{p['expression']}\n"
 
         return dedent(f"""
-            ## Step {step}
+            {hard_constraint}## Step {step}
 
             ### Current Alpha Expression
             ```
@@ -181,12 +182,11 @@ class PromptBuilder:
             ### Simulation Results
             {sim_summary}
 
-            ### Trajectory Summary
+            ### Recent Trajectory
             {history_summary}
             {parent_section}
 
-            Based on the above, generate your next action.
-            Remember: return ONLY valid JSON matching the Output Contract.
+            Return ONLY valid JSON matching the Output Contract.
         """).strip()
 
 

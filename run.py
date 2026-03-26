@@ -17,13 +17,12 @@ import argparse
 import json
 import os
 import sys
-import time
+import uuid
 from pathlib import Path
 
 from dotenv import load_dotenv
 from rich.console import Console
 from rich.panel import Panel
-from rich.progress import Progress, SpinnerColumn, TextColumn, TimeElapsedColumn
 from rich.table import Table
 
 load_dotenv()
@@ -41,15 +40,9 @@ sys.path.insert(0, str(Path(__file__).parent))
 from ace_extensions import get_alpha_recordset, get_datafield, get_stored_session
 from ace_lib import get_simulation_result_json
 from alpha_agent import AlphaAgent, PromptBuilder
-from alpha_env import AlphaAction, ActionType
+from alpha_env import AlphaAction, ActionType, build_hard_constraint
 from alpha_environment import AlphaEnvironment
-from alpha_utils import (
-    copy,
-    extract_datafields,
-    fix_fastexpr,
-    generate_pnl_chart,
-    get_insample_context,
-)
+from alpha_utils import extract_datafields, fix_fastexpr, generate_pnl_chart
 from population import AlphaCandidate, Population
 
 
@@ -98,17 +91,24 @@ def parse_agent_output(output: dict) -> AlphaAction:
         action_type = ActionType.MUTATE_EXPRESSION
 
     settings = {
-        "decay":          int(output.get("decay", 0)),
+        "decay":          max(int(output.get("decay", 4)), 1),   # enforce minimum decay=1
         "neutralization": str(output.get("neutralization", "SUBINDUSTRY")).strip(),
-        "truncation":     float(output.get("truncation", 0.08)),
-        "universe":       str(output.get("universe", "TOP3000")).strip(),
+        "truncation":     float(output.get("truncation", 0.05)),
+        "universe":       "TOP3000",   # hard locked — ignore whatever LLM says
     }
+
+    try:
+        confidence = float(output.get("confidence", 0.5))
+        confidence = max(0.0, min(1.0, confidence))
+    except (TypeError, ValueError):
+        confidence = 0.5
 
     return AlphaAction(
         action_type = action_type,
         expression  = fix_fastexpr(str(output.get("expression", ""))),
         settings    = settings,
         reasoning   = output.get("chain_of_thought", ""),
+        confidence  = confidence,
     )
 
 
@@ -139,10 +139,16 @@ def run_episode(
     _log_obs(obs, step=0)
 
     while not obs.done:
-        mode = env.mode
-
-        # Build system prompt targeted to current state
+        mode   = env.mode
         failing = obs.sim_result.failing_checks if obs.sim_result else []
+
+        # Confidence-based mode override (suggestion #3):
+        # if population is trending low-confidence, force explore
+        if mode == "exploit" and population.should_force_explore(threshold=0.45):
+            console.print("[dim]Low-confidence trend detected → overriding to EXPLORE[/]")
+            mode = "explore"
+
+        # Build system prompt targeted to current failing checks
         system_prompt = PromptBuilder.build_system_prompt(
             datafield_context = datafield_context,
             failing_checks    = failing,
@@ -159,7 +165,10 @@ def run_episode(
                     for p in pair
                 ]
 
-        # Build user message
+        # Build hard constraint message (suggestion #1)
+        hard_constraint = build_hard_constraint(failing, obs.sim_result)
+
+        # Build user message with hard constraints injected at top
         user_msg = PromptBuilder.build_user_message(
             step               = obs.step,
             current_expression = env.current_expression,
@@ -167,10 +176,14 @@ def run_episode(
             sim_summary        = env.build_sim_summary(obs.sim_result),
             history_summary    = obs.history_summary,
             parent_alphas      = parent_alphas,
+            hard_constraint    = hard_constraint,
         )
 
         # Generate action
-        console.print(f"\n[yellow]▶ Mode: {mode.upper()} | Step {obs.step + 1}/{sim_budget}[/]")
+        console.print(
+            f"\n[yellow]▶ Mode: {mode.upper()} | Step {obs.step + 1}/{sim_budget} | "
+            f"Best: {env.state.best_sharpe:.3f}[/]"
+        )
         console.print("[dim]Agent thinking...[/]")
         agent_output = agent.generate(system_prompt, user_msg, mode=mode)
 
@@ -187,14 +200,14 @@ def run_episode(
 
         console.print(
             f"[cyan]Action:[/] {action.action_type.value} | "
-            f"[cyan]Confidence:[/] {agent_output.get('confidence', '?')}"
+            f"[cyan]Confidence:[/] {action.confidence:.2f}"
         )
 
         # Step the environment
         obs = env.step(action)
         _log_obs(obs, step=obs.step)
 
-        # Try to add result to population
+        # Add to population with confidence stored
         if obs.sim_result:
             candidate = AlphaCandidate(
                 neg_reward  = -obs.reward,
@@ -207,11 +220,12 @@ def run_episode(
                 turnover    = obs.sim_result.turnover,
                 passing     = obs.sim_result.passing,
                 fingerprint = obs.sim_result.fingerprint,
+                confidence  = action.confidence,
                 episode_id  = episode_id,
             )
             added = population.try_add(candidate)
             if added:
-                console.print(f"[green]★ Added to population (size={population.statistics()['size']})[/]")
+                console.print(f"[green]★ Population: {population.statistics()['size']} elites[/]")
 
     # Episode summary
     pop_stats = population.statistics()
@@ -331,8 +345,7 @@ def main():
             ep_seed_expression = seed_expression
             ep_seed_settings   = seed_settings
 
-        import uuid as _uuid
-        episode_id = str(_uuid.uuid4())
+        episode_id = str(uuid.uuid4())
 
         summary = run_episode(
             env               = env,
