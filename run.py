@@ -274,9 +274,9 @@ def main():
     parser = argparse.ArgumentParser(description="AlphaOptimizer: RL-style alpha generation")
     parser.add_argument("--alpha_id", "-id", type=str, help="Seed alpha ID from BRAIN")
     parser.add_argument("--episodes",        type=int, default=3,  help="Number of episodes")
-    parser.add_argument("--sim_budget",      type=int, default=15, help="Max simulations per episode")
+    parser.add_argument("--sim_budget",      type=int, default=25, help="Max simulations per episode")
     parser.add_argument("--resume",          action="store_true",  help="Load saved population")
-    parser.add_argument("--population_size", type=int, default=50, help="Elite archive size")
+    parser.add_argument("--population_size", type=int, default=60, help="Elite archive size")
     parser.add_argument("--model",           type=str, default="gemini-2.5-flash")
     args = parser.parse_args()
 

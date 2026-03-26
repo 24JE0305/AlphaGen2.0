@@ -102,11 +102,11 @@ class PromptBuilder:
                 Make the SMALLEST change that fixes the failing check.
                 Do NOT rewrite expressions that are already working.
 
-                CRITICAL RULE FOR LOW_FITNESS:
-                If the expression already has quantile() or zscore() wrapper AND fitness < 1.0
-                AND turnover > 0.40 — the fix is SETTINGS ONLY. Use action_type=change_settings.
-                Keep the expression IDENTICAL. Only change: universe=TOP1000, decay=0.
-                Do not touch the expression at all in this case.
+                CRITICAL RULE FOR LOW_FITNESS & HIGH TURNOVER:
+                If the expression has a quantile() wrapper but turnover is still > 0.40, 
+                do NOT infinitely increase the settings decay (it destroys Sharpe). 
+                Instead, use action_type=mutate_expression and add mathematical smoothing 
+                like ts_decay_linear(signal, 5) INSIDE the expression, right before the wrapper.
             """),
             "diversify": dedent("""
                 ## MODE: DIVERSIFY

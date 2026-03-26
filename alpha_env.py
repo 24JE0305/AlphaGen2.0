@@ -146,28 +146,30 @@ def build_hard_constraint(failing_checks: list[str], result: Optional[SimResult]
     constraints = []
 
     if "LOW_FITNESS" in failing_checks:
-        has_wrapper = any(kw in result.expression for kw in ["quantile(", "zscore(rank("])
-        if not has_wrapper:
-            constraints.append(
-                "[LOW_FITNESS] No gaussian wrapper found. "
-                "MUST add quantile(signal, driver=\"gaussian\") as final line. "
-                "Change nothing else."
-            )
-        elif result.turnover > 0.40:
-            constraints.append(
-                f"[LOW_FITNESS] Wrapper present, turnover={result.turnover:.3f} > 0.40. "
-                f"MUST use action_type=change_settings. "
-                f"Increase decay by 2. universe=TOP3000 is LOCKED. Do not touch expression."
-            )
-        elif result.turnover > 0.30:
-            constraints.append(
-                f"[LOW_FITNESS] Wrapper present, turnover={result.turnover:.3f}. "
-                f"MUST use action_type=change_settings. Increase decay by 1."
-            )
-        else:
-            constraints.append(
-                "[LOW_FITNESS] Turnover ok. Try swapping quantile() to zscore(rank()) or vice versa."
-            )
+            has_wrapper = any(kw in result.expression for kw in ["quantile(", "zscore(rank("])
+            if not has_wrapper:
+                constraints.append(
+                    "[LOW_FITNESS] No gaussian wrapper found. "
+                    "MUST add quantile(signal, driver=\"gaussian\") as final line. "
+                    "Change nothing else."
+                )
+            elif result.turnover > 0.40:
+                # FIX: Force mathematical smoothing instead of infinitely increasing settings decay
+                constraints.append(
+                    f"[LOW_FITNESS] Wrapper present, turnover={result.turnover:.3f} > 0.40. "
+                    f"MUST use action_type=mutate_expression. "
+                    f"Inject ts_decay_linear(..., 5) or hump() BEFORE the quantile() wrapper "
+                    f"to reduce turnover mathematically. Do NOT just increase the decay setting."
+                )
+            elif result.turnover > 0.30:
+                constraints.append(
+                    f"[LOW_FITNESS] Wrapper present, turnover={result.turnover:.3f}. "
+                    f"Try swapping quantile() to zscore(rank()) or add a hump() filter."
+                )
+            else:
+                constraints.append(
+                    "[LOW_FITNESS] Turnover ok. Try swapping quantile() to zscore(rank()) or vice versa."
+                )
 
     if "HIGH_TURNOVER" in failing_checks:
         constraints.append(
