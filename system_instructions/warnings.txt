@@ -48,13 +48,33 @@ Fix Priority:
 DO NOT: Use ts_decay_linear or hump.
 
 ### LOW FITNESS (< 1.0)
-Root Cause: Non-normal distribution (fat tails, skewness)
-Fix Priority:
-  1. Wrap final output in: quantile(signal, driver="gaussian")
-  2. Or use: zscore(rank(signal))
-  3. Ensure the output spans [-1, 1] uniformly
-The formula: fitness = sharpe * sqrt(abs(returns) / turnover)
-So increasing Sharpe OR reducing turnover (moderately) both help.
+Root Cause: THREE distinct causes. Diagnose first, THEN act.
+
+fitness = sharpe x sqrt(abs(returns) / turnover)
+
+CAUSE A - Distribution not gaussian:
+  Symptom: quantile() NOT yet applied
+  Fix: Wrap final output in quantile(signal, driver="gaussian")
+  That is all. Do not change anything else.
+
+CAUSE B - Turnover too high dragging fitness down:
+  Symptom: quantile() already applied, Sharpe decent (>1.3), turnover > 0.45, fitness stuck 0.6-0.8
+  CRITICAL: Do NOT smooth the expression with ts_decay_linear - this kills Sharpe.
+  Fix via SETTINGS ONLY, zero expression changes:
+    universe TOP3000 -> TOP1000 (cleaner stocks, higher returns per unit risk)
+    decay set to 0 (stop over-smoothing)
+    truncation lower to 0.04
+  This is a settings problem, not an expression problem.
+
+CAUSE C - Returns magnitude too low:
+  Symptom: quantile() applied, turnover ok (<0.35), Sharpe ok, fitness still low
+  Fix: universe -> TOP1000 or TOP500 (higher beta = more return magnitude)
+
+DECISION TREE:
+  quantile NOT applied? -> CAUSE A, wrap it, stop.
+  quantile applied AND turnover > 0.40? -> CAUSE B, settings only, no expression change.
+  quantile applied AND turnover < 0.35? -> CAUSE C, change universe only.
+  quantile applied AND turnover 0.35-0.40? -> try zscore(rank(signal)) swap.
 
 ### CONCENTRATED_WEIGHT
 Root Cause: A few stocks dominate the portfolio (top-heavy)

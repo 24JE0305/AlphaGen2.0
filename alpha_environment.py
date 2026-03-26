@@ -88,8 +88,14 @@ class AlphaEnvironment:
             self._state.best_sharpe = result.sharpe
             self._state.best_alpha_id = result.alpha_id
             reward, breakdown = RewardCalculator.compute(result, None, self._state)
+            # Start in the right mode based on seed quality — don't always explore
+            if result.sharpe >= 1.2 or not result.failing_checks:
+                self._mode = "exploit"
+            else:
+                self._mode = "explore"
         else:
             reward, breakdown = 0.0, {}
+            self._mode = "explore"
 
         return AlphaObservation(
             episode_id     = self._state.episode_id,
@@ -109,9 +115,13 @@ class AlphaEnvironment:
         self._state.step_count += 1
         step = self._state.step_count
 
-        # Apply the action's expression/settings
-        new_expression = action.expression or self._current_expression
-        new_settings   = dict(self._current_settings)
+        # For change_settings: keep expression unchanged, only update settings
+        if action.action_type == ActionType.CHANGE_SETTINGS:
+            new_expression = self._current_expression   # locked — no expression change
+        else:
+            new_expression = action.expression or self._current_expression
+
+        new_settings = dict(self._current_settings)
         if action.settings:
             new_settings.update(action.settings)
 

@@ -171,8 +171,8 @@ def run_episode(
 
         # Generate action
         console.print(f"\n[yellow]▶ Mode: {mode.upper()} | Step {obs.step + 1}/{sim_budget}[/]")
-        with console.status("[dim]Agent thinking...[/]"):
-            agent_output = agent.generate(system_prompt, user_msg, mode=mode)
+        console.print("[dim]Agent thinking...[/]")
+        agent_output = agent.generate(system_prompt, user_msg, mode=mode)
 
         action = parse_agent_output(agent_output)
 

@@ -101,7 +101,12 @@ class PromptBuilder:
                 You are in exploitation mode. The signal is promising — improve it incrementally.
                 Make the SMALLEST change that fixes the failing check.
                 Do NOT rewrite expressions that are already working.
-                Focus on wrapping or adjusting, not replacing.
+
+                CRITICAL RULE FOR LOW_FITNESS:
+                If the expression already has quantile() or zscore() wrapper AND fitness < 1.0
+                AND turnover > 0.40 — the fix is SETTINGS ONLY. Use action_type=change_settings.
+                Keep the expression IDENTICAL. Only change: universe=TOP1000, decay=0.
+                Do not touch the expression at all in this case.
             """),
             "diversify": dedent("""
                 ## MODE: DIVERSIFY
