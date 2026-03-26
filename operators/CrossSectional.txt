@@ -1,0 +1,6 @@
+normalize(x): Centers the daily cross-section by subtracting the market mean.
+quantile(x, driver="gaussian"): Ranks and applies a Gaussian distribution to reduce outliers. Highly effective for fixing LOW_FITNESS.
+rank(x): Ranks the values of x across all instruments from 0.0 to 1.0. Essential for neutralizing extreme outliers and normalizing data.
+scale(x, scale=1): Scales x so the sum of absolute values equals a specified book size.
+winsorize(x, std=4): Limits extreme values to within 4 standard deviations from the mean. Fixes CONCENTRATED_WEIGHT and extreme outliers.
+zscore(x): Calculates the cross-sectional Z-score (standard deviations from the market mean). Standardizes the signal across all stocks.

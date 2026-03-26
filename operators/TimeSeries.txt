@@ -1,0 +1,24 @@
+days_from_last_change(x): Calculates the number of days since the last change in the value of x.
+hump(x, hump=0.01): Limits the amount and magnitude of changes in input. Highly effective for reducing turnover.
+kth_element(x, d, k, ignore="NaN"): Returns the K-th value looking back over d days.
+last_diff_value(x, d): Returns the most recent value of x from the past d days that is different from today's value.
+ts_arg_max(x, d): Returns the number of days since the maximum value occurred in the past d days (0 means today).
+ts_arg_min(x, d): Returns the number of days since the minimum value occurred in the past d days (0 means today).
+ts_av_diff(x, d): Calculates x minus the ts_mean of x over d days, ignoring NaNs. Measures deviation from the recent average.
+ts_backfill(x, lookback=d, k=1): Replaces NaN values with the most recent valid value from the lookback window. Crucial for handling missing data.
+ts_corr(x, y, d): Calculates the Pearson correlation between x and y over the past d days.
+ts_count_nans(x, d): Counts the number of missing (NaN) values in x over the past d days.
+ts_covariance(y, x, d): Calculates the covariance between y and x over the past d days.
+ts_decay_linear(x, d): Applies a linear decay to x over d days. Excellent for smoothing signals and reducing turnover.
+ts_delay(x, d): Returns the value of x from exactly d days ago.
+ts_delta(x, d): Calculates the difference between today's x and x from d days ago (x - ts_delay(x, d)). Good for measuring momentum.
+ts_mean(x, d): Calculates the simple average of x over the past d days.
+ts_product(x, d): Returns the product of the values of x over the past d days.
+ts_quantile(x, d, driver="gaussian"): Calculates the ts_rank and transforms it using a normal distribution. Good for reshaping skewed rolling data.
+ts_rank(x, d): Ranks today's value of x against its historical values over the past d days (outputs 0.0 to 1.0).
+ts_regression(y, x, d): Returns regression parameters between y and x over d days.
+ts_scale(x, d): Scales a time series to a 0.0 to 1.0 range based on its min/max over the past d days.
+ts_std_dev(x, d): Calculates the standard deviation of x over the past d days.
+ts_step(1): Returns a counter that increments by one each day.
+ts_sum(x, d): Calculates the sum of x over the past d days.
+ts_zscore(x, d): Calculates the time-series Z-score (standard deviations from the recent d-day average). Normalizes the signal over time.

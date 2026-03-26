@@ -1,0 +1,2 @@
+vec_avg(x): Calculates the mean of all elements in a vector matrix field, collapsing it into a single scalar value per instrument.
+vec_sum(x): Calculates the sum of all elements in a vector matrix field.

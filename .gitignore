@@ -1,0 +1,33 @@
+# Environment & Secrets
+.env
+*.env
+session.pkl
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+venv/
+env/
+.venv/
+
+# Generated outputs
+population.json
+results.jsonl
+sim_cache.json
+pnl_chart.png
+ace.log
+*.log
+*.png
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

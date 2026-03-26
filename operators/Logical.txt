@@ -1,0 +1,11 @@
+and(x, y): Returns 1 if both x and y are true (1), otherwise returns 0.
+or(x, y): Returns 1 if either x or y is true (1), otherwise returns 0.
+not(x): Returns 1 if x is false (0), and 0 if x is true (1).
+if_else(condition, true_result, false_result): Returns true_result if the condition is true, otherwise returns false_result. Highly useful for masking data or capping extreme values.
+is_nan(x): Returns 1 if x is NaN (Not a Number), otherwise returns 0. Essential for handling missing data before calculations.
+x < y: Returns 1 if x is strictly less than y, otherwise 0.
+x <= y: Returns 1 if x is less than or equal to y, otherwise 0.
+x > y: Returns 1 if x is strictly greater than y, otherwise 0.
+x >= y: Returns 1 if x is greater than or equal to y, otherwise 0.
+x == y: Returns 1 if x is exactly equal to y, otherwise 0.
+x != y: Returns 1 if x is not equal to y, otherwise 0.

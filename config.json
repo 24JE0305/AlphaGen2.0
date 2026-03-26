@@ -1,0 +1,29 @@
+{
+    "iterations": 6,
+    "operators": [
+        "Arithmetic",
+        "Logical",
+        "CrossSectional",
+        "TimeSeries",
+        "Group",
+        "Transformational",
+        "Vector"
+    ],
+    "groups": [
+        "market",
+        "sector",
+        "industry",
+        "subindustry",
+        "currency"
+    ],
+    "pnl_chart": {
+        "name": "pnl_chart.png",
+        "test": 252,
+        "color": {
+            "train": "#1f77b4",
+            "test": "#ff7f0e",
+            "secondary": "#2ca02c",
+            "tertiary": "#d62728"
+        }
+    }
+}

@@ -1,0 +1,6 @@
+group_backfill(x, group, d): Fills NaN values using the winsorized mean of the group over the past d days.
+group_mean(x, weight, group): Calculates the mean of x within the specified group. (Typically use 1 for weight).
+group_neutralize(x, group): Subtracts the group mean from x. Crucial for removing sector/industry risk and fixing LOW_SUB_UNIVERSE_SHARPE.
+group_rank(x, group): Ranks x within its group from 0.0 to 1.0. Fixes CONCENTRATED_WEIGHT by forcing even distribution inside groups.
+group_scale(x, group): Normalizes values within the group to a 0.0 to 1.0 range.
+group_zscore(x, group): Calculates the Z-score of x relative ONLY to its group mean. Highly effective for finding intra-sector winners/losers.

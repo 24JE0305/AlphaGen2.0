@@ -1,0 +1,17 @@
+{
+    "model": "gemini-2.5-flash",
+    "temperature": 0.3,
+    "thinking_level": "high",
+    "structured_output": {
+        "schema_description": "Refined alpha expression and settings. Goal: Maintain high Sharpe while incrementally fixing failing checks. Prioritize novel mathematical combinations.",
+        "schema": {
+            "Performance_Analysis": "Analyze the previous iteration.",
+            "Correction_Strategy": "State exactly how you will fix the failing check.",
+            "Alpha Expression": "The updated, syntactically correct FASTEXPR string.",
+            "Decay": "Integer between 0 and 20.",
+            "Neutralization": "One of: MARKET, SECTOR, INDUSTRY, SUBINDUSTRY.",
+            "Truncation": "Float between 0.01 and 0.1.",
+            "Universe": "One of: TOP3000, TOP1000, TOP500, TOP200"
+        }
+    }
+}

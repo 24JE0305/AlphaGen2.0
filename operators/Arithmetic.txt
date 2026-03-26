@@ -1,0 +1,16 @@
+abs(x): Returns the absolute value of x.
+sign(x): Returns 1 if x is positive, -1 if x is negative, and 0 if x is zero.
+log(x): Calculates the natural logarithm of x (commonly used to transform positive data).
+sqrt(x): Returns the non-negative square root of x.
+power(x, y): Returns x raised to the power of y.
+signed_power(x, y): Returns x raised to the power of y such that the final result preserves the original sign of x.
+fraction(x): Returns the fractional part of x (e.g., fraction(3.14) is 0.14).
+add(x, y): Adds inputs element-wise. Equivalent to x + y.
+subtract(x, y): Subtracts inputs left to right. Equivalent to x - y.
+multiply(x, y): Multiplies inputs element-wise. Equivalent to x * y.
+divide(x, y): Divides x by y. Equivalent to x / y.
+inverse(x): Returns the mathematical inverse. Equivalent to 1 / x.
+reverse(x): Reverses the sign of the input. Equivalent to -x.
+max(x, y, ...): Returns the maximum value of all provided inputs (requires at least 2 inputs).
+min(x, y, ...): Returns the minimum value of all provided inputs (requires at least 2 inputs).
+densify(x): Converts a grouping field of many buckets into a lesser number of only available buckets to make it computationally efficient.

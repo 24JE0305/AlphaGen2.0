@@ -1,0 +1,155 @@
+ADVANCED ALPHA GENERATION PLAYBOOK
+====================================
+
+## PART 1: THE SIGNAL HIERARCHY
+Understanding WHAT makes a good alpha before HOW to code it.
+
+### Level 1 - Raw Signal (weak, easily arb'd)
+Single data field with minimal transformation.
+Example: rank(volume)
+Problem: Obvious. Overcrowded. Will fail SELF_CORRELATION.
+
+### Level 2 - Relative Signal (better)  
+Compare an asset against its group or historical self.
+Example: group_zscore(close / ts_mean(close, 20), sector)
+Problem: Still derivative. Limited informational advantage.
+
+### Level 3 - Compound Signal (strong)
+Cross two independent signals. One identifies WHAT to trade, one identifies WHEN.
+Example: rank(ts_delta(volume, 5) / ts_std_dev(volume, 20)) * rank(-ts_delta(close, 20))
+Logic: High abnormal volume + price mean reversion = informed selling signal.
+
+### Level 4 - Regime-Conditional Signal (elite)
+Apply signal only when market conditions favor it.
+Example: trade_when(ts_zscore(vix, 20) > 1, reversal_signal, 0)
+Logic: Reversal signals work better in high-volatility regimes.
+
+---
+
+## PART 2: THE FAILURE DIAGNOSIS PROTOCOL
+
+Before making any change, diagnose the root cause:
+
+### HIGH TURNOVER (>70%)
+Root Cause: Signal oscillates daily (noise dominant)
+Fix Priority:
+  1. Add ts_decay_linear(signal, 5) wrapper (smooths without destroying ranking)
+  2. Increase Decay setting to 3-5
+  3. Use trade_when(entry_condition, signal, exit_condition) to hold positions
+  4. Replace ts_delta(x, 1) with ts_delta(x, 5) or ts_delta(x, 10)
+DO NOT: Change the core math. Only smooth the output.
+
+### LOW TURNOVER (<10%)
+Root Cause: Signal too stable (position never changes)
+Fix Priority:
+  1. Reduce Decay to 0
+  2. Use shorter lookback windows (ts_delta(x, 2) not ts_delta(x, 60))
+  3. Add a faster secondary signal with multiplication
+DO NOT: Use ts_decay_linear or hump.
+
+### LOW FITNESS (< 1.0)
+Root Cause: Non-normal distribution (fat tails, skewness)
+Fix Priority:
+  1. Wrap final output in: quantile(signal, driver="gaussian")
+  2. Or use: zscore(rank(signal))
+  3. Ensure the output spans [-1, 1] uniformly
+The formula: fitness = sharpe * sqrt(abs(returns) / turnover)
+So increasing Sharpe OR reducing turnover (moderately) both help.
+
+### CONCENTRATED_WEIGHT
+Root Cause: A few stocks dominate the portfolio (top-heavy)
+Fix Priority:
+  1. Lower Truncation to 0.02 or 0.01
+  2. Wrap signal in: group_rank(signal, industry)
+  3. Or: winsorize(signal, std=2)
+DO NOT: Increase truncation — that makes it worse.
+
+### LOW_SUB_UNIVERSE_SHARPE
+Root Cause: Signal works globally but not within specific sub-universes
+Fix Priority:
+  1. Change Neutralization to INDUSTRY or SUBINDUSTRY
+  2. Or explicitly neutralize: group_neutralize(signal, subindustry)
+  3. The signal needs to identify winners WITHIN sectors, not across them
+DO NOT: Use MARKET neutralization — too blunt.
+
+### LOW SHARPE (< 0.8)
+Root Cause: Core signal has no predictive power
+Fix Priority:
+  1. THIS REQUIRES A COMPLETE REWRITE. Settings will not save this.
+  2. Start from a different signal category (see Compound Signal patterns)
+  3. Try: volatility-adjusted momentum, earnings surprise decay, or analyst revision momentum
+
+---
+
+## PART 3: ADVANCED SIGNAL ARCHITECTURES
+
+### Pattern A: Volatility-Normalized Momentum
+```
+signal = ts_delta(close, 20) / ts_std_dev(close, 20);
+alpha = quantile(group_zscore(signal, sector), driver="gaussian")
+```
+
+### Pattern B: Earnings Surprise Continuation
+```
+surprise_signal = (sales - ts_delay(sales, 63)) / ts_std_dev(sales, 252);
+recency_weight = ts_decay_linear(surprise_signal, 21);
+alpha = quantile(rank(recency_weight), driver="gaussian")
+```
+
+### Pattern C: Liquidity-Adjusted Mean Reversion
+```
+ret_signal = -1 * ts_delta(close, 5);
+vol_weight = 1 / (ts_std_dev(volume, 20) + 0.001);
+combined = ret_signal * vol_weight;
+alpha = quantile(group_neutralize(combined, sector), driver="gaussian")
+```
+
+### Pattern D: Cross-Asset Correlation Breakout
+```
+corr_signal = ts_corr(close, adv20, 20);
+breakout = ts_delta(corr_signal, 5);
+alpha = quantile(rank(-1 * breakout), driver="gaussian")
+```
+
+### Pattern E: Fundamental Value Composite
+```
+value_1 = rank(1 / pbRatio);
+value_2 = rank(1 / peRatio);
+composite = 0.5 * value_1 + 0.5 * value_2;
+alpha = quantile(group_zscore(composite, industry), driver="gaussian")
+```
+
+---
+
+## PART 4: SYNTAX RULES (CRITICAL — VIOLATIONS CRASH THE SIMULATOR)
+
+1. Every statement ends with a semicolon EXCEPT the last one
+2. Final statement must be a pure expression (not an assignment)
+3. Variable names: lowercase letters, numbers, underscores only
+4. No Python-style operators: use divide(a,b) not a/b when in doubt
+5. All function arguments must be present: ts_corr requires EXACTLY 3 args
+6. group_* functions: third argument must be a grouping field string, not a variable
+7. Parenthesis balance: count opening vs closing — they must match
+
+### Common Crashes
+WRONG: ts_corr(close, volume)         → Missing 3rd arg (lookback)
+RIGHT: ts_corr(close, volume, 20)
+
+WRONG: group_rank(signal, "industry")  → String argument not valid
+RIGHT: group_rank(signal, industry)
+
+WRONG: signal = rank(close)            → Bare assignment as final line  
+RIGHT: signal = rank(close);\nzscore(signal)
+
+---
+
+## PART 5: SETTINGS INTERACTION MATRIX
+
+| Setting       | Effect on Sharpe | Effect on Turnover | Effect on Fitness |
+|--------------|-----------------|-------------------|------------------|
+| Decay ↑      | Often ↓ slightly | ↓↓ significantly  | Depends           |
+| Truncation ↓ | Often ↓ slightly | No effect         | ↑ (less waste)   |
+| SUBINDUSTRY  | Best for most    | No effect         | ↑ or ↓           |
+| INDUSTRY     | Good for value   | No effect         | ↑ or ↓           |
+| TOP1000      | ↑ (cleaner data) | No effect         | ↑                |
+| TOP3000      | ↓ (noisy small)  | No effect         | ↓ (more waste)   |

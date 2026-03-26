@@ -1,0 +1,2 @@
+bucket(rank(x), range="0, 1, 0.1"): Creates custom categorical buckets based on the ranked values of x.
+trade_when(entry_condition, signal, exit_condition): Updates the Alpha signal only when the entry condition is met. Highly effective for crushing HIGH_TURNOVER by holding positions.
